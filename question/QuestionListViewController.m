@@ -7,6 +7,7 @@
 //
 
 #import "QuestionListViewController.h"
+#import "WebViewController.h"
 
 @interface QuestionListViewController ()
 @property (strong, nonatomic) NSArray *questions;
@@ -27,9 +28,7 @@
 {
     [super viewDidLoad];
 
-    self.questions = @[@"question 1", @"question 2", @"question 3"];
-    
-    [self.tableView reloadData];
+    [self fetchNewQuestions];
 }
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView
@@ -45,13 +44,17 @@
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
 {
     static NSString *CellIdentifier = @"Cell";
-    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:CellIdentifier];
-    
+    UITableViewCell *cell = [self.tableView dequeueReusableCellWithIdentifier:CellIdentifier];
     if (cell==nil) {
         cell = [[UITableViewCell alloc]initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:CellIdentifier];
     }
     
-    cell.textLabel.text = self.questions[indexPath.row];
+    NSDictionary *question = self.questions[indexPath.row];
+    
+    cell.textLabel.text = question[@"dateLabel"];
+    NSData *dt = [NSData dataWithContentsOfURL:[NSURL URLWithString:question[@"image"][@"url"]]];
+    cell.imageView.image = [[UIImage alloc] initWithData:dt];
+    cell.detailTextLabel.text = question[@"telop"];
     
     return cell;
 }
@@ -95,16 +98,50 @@
 }
 */
 
-/*
-#pragma mark - Navigation
-
-// In a story board-based application, you will often want to do a little preparation before navigation
 - (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender
 {
-    // Get the new view controller using [segue destinationViewController].
-    // Pass the selected object to the new view controller.
+    UITableViewCell *cell = (UITableViewCell *)sender;
+    NSLog(@"Value of string is %@", cell);
+    NSIndexPath *indexPath = [self.tableView indexPathForCell:cell];
+    NSDictionary *question = self.questions[indexPath.row];
+    
+    WebViewController *viewController = [segue destinationViewController];
+    viewController.url = [NSURL URLWithString:@"http://livedoor.com"];
 }
 
- */
+- (void) fetchNewQuestions
+{
+    NSURLSession *session = [NSURLSession sharedSession];
+    NSURL *url = [NSURL URLWithString:@"http://weather.livedoor.com/forecast/webservice/json/v1?city=130010"];
+    NSURLSessionDataTask *task = [session dataTaskWithURL:url
+                                        completionHandler:^(NSData *data,
+                                                            NSURLResponse *response,
+                                                            NSError *error)
+    {
+        if (error)
+        {
+            return;
+        }
+        
+        NSError *jsonError = nil;
+        NSDictionary *jsonDictionary = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
+        
+        if (jsonError != nil) return;
+        
+        self.questions = jsonDictionary[@"forecasts"];
+        
+        [self performSelectorOnMainThread:@selector(reloadTableView) withObject:nil waitUntilDone:YES];
+        
+        
+    }];
+    
+    [task resume];
+    
+}
+
+- (void) reloadTableView
+{
+    [self.tableView reloadData];
+}
 
 @end
